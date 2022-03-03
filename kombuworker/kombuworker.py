@@ -3,8 +3,13 @@
 Will split this into intelligible modules later.
 """
 import queue
+import socket
 import requests
+import threading
+from enum import Enum
 from time import sleep
+from typing import Iterable
+from urllib.parse import urlparse
 
 import tenacity
 from kombu import Connection
@@ -14,10 +19,12 @@ from kombu.simple import SimpleQueue
 # Defining retry behavior
 retry = tenacity.retry(
             reraise=True, stop=tenacity.stop_after_attempt(10),
-            wait=tenacity.wait_random_exponential(multiplier=0.5, max=60,0))
+            wait=tenacity.wait_random_exponential(multiplier=0.5, max=60.0))
 
 # acknowledged flag
 ACK = None
+MSG_QUEUE = queue.Queue()
+CMD_QUEUE = queue.Queue()
 
 
 @retry
@@ -66,11 +73,11 @@ class ThreadState(Enum):
 def fetch_thread(queue_url: str,
                  queue_name: str,
                  msg_queue: queue.Queue,
-                 cmd_queue: queue.Queue
+                 cmd_queue: queue.Queue,
                  connect_timeout: int = 60,
                  heartbeat: int = 600,
                  ) -> None:
-    """Thread functionality for fetching raw tasks and maintaining heartbeat."""
+    """Thread for fetching raw tasks and maintaining heartbeat."""
     with Connection(
             queue_url,
             connect_timeout=connect_timeout,
@@ -83,7 +90,7 @@ def fetch_thread(queue_url: str,
         while True:
             if state == ThreadState.FETCH:
                 try:
-                    fetch_message(queue, conn, msg_queue)
+                    msg = fetch_message(queue, conn, msg_queue)
                     state = ThreadState.WAIT
 
                 except SimpleQueue.Empty:
@@ -111,6 +118,16 @@ def fetch_thread(queue_url: str,
                             conn.heartbeat_check()
                     else:
                         sleep(1)
+
+
+def fetch_message(queue: SimpleQueue,
+                  conn: Connection,
+                  msg_queue: queue.Queue):
+    pass
+
+
+class Task:
+    pass
 
 
 def fetch_tasks(queue_url: str,
@@ -151,7 +168,7 @@ def fetch_tasks(queue_url: str,
             waiting_period = min(waiting_period * 2, 60)
             continue
 
-        print(f"message received: {message}")
+        print(f"message received: {msg}")
         waiting_period = 1
         num_tries = 0
 

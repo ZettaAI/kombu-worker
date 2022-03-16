@@ -2,6 +2,7 @@ import sys
 import time
 
 import pytest
+import requests
 from kombu import Connection
 from kombu.simple import SimpleQueue
 
@@ -9,7 +10,6 @@ from kombuworker import queuetools as qt
 
 
 QUEUENAME = "testqueue"
-QUEUEURL = "amqp://localhost:5672"
 
 
 def count_msgs(queue_url: str, queue_name: str) -> int:
@@ -30,34 +30,37 @@ def count_msgs(queue_url: str, queue_name: str) -> int:
         return num_fetched
 
 
-def test_insert():
+def clear_queue(queue_url: str, queue_name: str) -> None:
     try:
-        nummsg_orig = qt.num_msgs(QUEUEURL, QUEUENAME)
-    except RuntimeError:
-        # queue doesn't exist yet
-        nummsg_orig = 0
-    print(f"orig length: {nummsg_orig}", file=sys.stderr)
+        qt.purge_queue(queue_url, QUEUENAME)
+    except requests.exceptions.ConnectionError:
+        # queue container not up yet?
+        time.sleep(5)
+
+
+def test_insert(rabbitMQurl):
+    clear_queue(rabbitMQurl, QUEUENAME)
 
     payloads = ["task"] * 10
     start_time = time.time()
-    qt.insert_msgs(QUEUEURL, QUEUENAME, payloads)
+    qt.insert_msgs(rabbitMQurl, QUEUENAME, payloads)
     end_time = time.time()
     print(f"insertion call complete in {end_time-start_time:.3f}s", file=sys.stderr)
     time.sleep(0.1)
 
-    assert count_msgs(QUEUEURL, QUEUENAME) == nummsg_orig + len(payloads)
+    assert count_msgs(rabbitMQurl, QUEUENAME) == len(payloads)
 
 
-def test_fetch():
+def test_fetch(rabbitMQurl):
     """Trying to make fetch happen."""
-    qt.purge_queue(QUEUEURL, QUEUENAME)
+    clear_queue(rabbitMQurl, QUEUENAME)
 
     payloads = ["task"] * 11
-    qt.insert_msgs(QUEUEURL, QUEUENAME, payloads)
+    qt.insert_msgs(rabbitMQurl, QUEUENAME, payloads)
 
     num_fetched = 0
     for msg in qt.fetch_msgs(
-        QUEUEURL,
+        rabbitMQurl,
         QUEUENAME,
         init_waiting_period=0.1,
         max_waiting_period=1,

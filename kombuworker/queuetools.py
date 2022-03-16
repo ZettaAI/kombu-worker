@@ -28,6 +28,7 @@ retry = tenacity.retry(
 # these should only hold one message at most unless someone's messing with them
 __REC_THREADQ = queue.Queue()  # stores received messages
 __ACK_THREADQ = queue.Queue()  # whether to 'ack' the received messages
+__DIE_THREADQ = queue.Queue()  # whether to 'ack' the received messages
 
 
 def insert_msgs(
@@ -54,6 +55,7 @@ def fetch_msgs(
     verbose: bool = False,
     rec_threadq: queue.Queue = __REC_THREADQ,
     ack_threadq: queue.Queue = __ACK_THREADQ,
+    die_threadq: queue.Queue = __DIE_THREADQ,
 ) -> Generator[kombu.Message, None, None]:
     """Generator for continuously pulling messages from a queue.
 
@@ -61,7 +63,7 @@ def fetch_msgs(
     """
     th = threading.Thread(
         target=_fetch_thread,
-        args=(queue_url, queue_name, rec_threadq, ack_threadq),
+        args=(queue_url, queue_name, rec_threadq, ack_threadq, die_threadq),
         kwargs=dict(verbose=verbose, sleep_interval=init_waiting_period),
     )
     th.daemon = True
@@ -103,6 +105,10 @@ def fetch_msgs(
             sleep(waiting_period)
             waiting_period = min(waiting_period * 2, max_waiting_period)
 
+    die_threadq.put("DIE")
+    while th.is_alive():
+        th.join()
+
 
 class ThreadState(Enum):
     """A simple state switch for fetch_thread."""
@@ -116,6 +122,7 @@ def _fetch_thread(
     queue_name: str,
     rec_threadq: queue.Queue,
     ack_threadq: queue.Queue,
+    die_threadq: queue.Queue,
     connect_timeout: int = 120,
     heartbeat_interval: int = 60,
     verbose: bool = False,
@@ -130,6 +137,10 @@ def _fetch_thread(
         heartbeat_time = time.time()
 
         while True:
+            if not die_threadq.empty():
+                die_threadq.get()
+                return
+
             if state == ThreadState.FETCH:
                 try:
                     fetch_msg(queue, rec_threadq, verbose)
@@ -142,8 +153,11 @@ def _fetch_thread(
             elif state == ThreadState.WAIT:
                 # delete task from queue if desired
                 if not ack_threadq.empty():
-                    ackmsg = ack_threadq.get()
-                    ackmsg.ack()
+                    msg_or_die = ack_threadq.get()
+                    if isinstance(msg_or_die, kombu.Message):
+                        msg_or_die.ack()
+                    elif msg_or_die == DIEFLAG:
+                        return
 
                     state = ThreadState.FETCH
                     heartbeat_time = time.time()

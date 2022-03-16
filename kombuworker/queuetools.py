@@ -1,6 +1,7 @@
 """Kombu message queue interface."""
 from __future__ import annotations
 
+import time
 import queue
 import socket
 import threading
@@ -24,10 +25,9 @@ retry = tenacity.retry(
 )
 
 # Queues for inter-thread communication
+# these should only hold one message at most unless someone's messing with them
 __REC_THREADQ = queue.Queue()  # stores received messages
 __ACK_THREADQ = queue.Queue()  # whether to 'ack' the received messages
-# arbitrary flag for thread communication above
-ACK = None
 
 
 def insert_msgs(
@@ -62,7 +62,7 @@ def fetch_msgs(
     th = threading.Thread(
         target=_fetch_thread,
         args=(queue_url, queue_name, rec_threadq, ack_threadq),
-        kwargs=dict(verbose=verbose),
+        kwargs=dict(verbose=verbose, sleep_interval=init_waiting_period),
     )
     th.daemon = True
     th.start()
@@ -74,7 +74,8 @@ def fetch_msgs(
         try:
             msg = rec_threadq.get_nowait()
 
-            print(f"message received: {msg}")
+            if verbose:
+                print(f"message received: {msg}")
             waiting_period = init_waiting_period
             num_tries = 0
 
@@ -84,12 +85,15 @@ def fetch_msgs(
             try:
                 num_in_queue = num_msgs(queue_url)
                 if num_in_queue == 0:
-                    break
+                    if verbose:
+                        print("queue empty")
+                    raise Exception("queue empty")  # increment num_tries
                 else:
-                    print(
-                        f"{num_in_queue} tasks remain in the queue,"
-                        f" sleeping for {waiting_period}s"
-                    )
+                    if verbose:
+                        print(
+                            f"{num_in_queue} messages remain in the queue,"
+                            f" sleeping for {waiting_period}s"
+                        )
 
             except Exception:
                 num_tries += 1
@@ -112,17 +116,18 @@ def _fetch_thread(
     queue_name: str,
     rec_threadq: queue.Queue,
     ack_threadq: queue.Queue,
-    connect_timeout: int = 60,
-    heartbeat: int = 600,
+    connect_timeout: int = 120,
+    heartbeat_interval: int = 60,
     verbose: bool = False,
+    sleep_interval=1,
 ) -> None:
     """Thread for fetching raw tasks and maintaining a heartbeat."""
     with Connection(
-        queue_url, connect_timeout=connect_timeout, heartbeat=heartbeat
+        queue_url, connect_timeout=connect_timeout, heartbeat=10 * heartbeat_interval
     ) as conn:
         queue = conn.SimpleQueue(queue_name)
         state = ThreadState.FETCH
-        heartbeat_cycle = 0
+        heartbeat_time = time.time()
 
         while True:
             if state == ThreadState.FETCH:
@@ -132,7 +137,7 @@ def _fetch_thread(
 
                 except SimpleQueue.Empty:
                     conn.heartbeat_check()
-                    sleep(10)
+                    sleep(sleep_interval)
 
             elif state == ThreadState.WAIT:
                 # delete task from queue if desired
@@ -141,20 +146,19 @@ def _fetch_thread(
                     ackmsg.ack()
 
                     state = ThreadState.FETCH
-                    heartbeat_cycle = 0
+                    heartbeat_time = time.time()
 
                 else:
-                    # these count seconds since we sleep for 1s below
-                    heartbeat_cycle += 1
-                    if heartbeat_cycle % 60 == 0:
+                    if time.time() - heartbeat_time > heartbeat_interval:
                         try:
                             # if there is an event on the connection
                             # this counts as an implicit heartbeat?
                             conn.drain_events(timeout=10)
                         except socket.timeout:
                             conn.heartbeat_check()
+                            heartbeat_time = time.time()
                     else:
-                        sleep(1)
+                        sleep(sleep_interval)
 
 
 def fetch_msg(

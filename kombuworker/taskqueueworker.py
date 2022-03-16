@@ -1,4 +1,6 @@
 """Task queue functionality using python-task-queue's conventions."""
+from __future__ import annotations
+
 import sys
 import time
 import json
@@ -25,7 +27,7 @@ def fetch_tasks(
     max_waiting_period: int = 60,
     max_num_retries: int = 5,
     verbose: bool = False,
-) -> Generator[Union[FunctionTask, RegisteredTask]]:
+) -> Generator[Union[FunctionTask, RegisteredTask], None, None]:
     """Fetches tasks from the queue."""
     for message in qt.fetch_msgs(
         queue_url,

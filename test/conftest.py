@@ -9,7 +9,7 @@ import signal
 import subprocess
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def rabbitMQurl():
     """Starts a RabbitMQ docker container and tears it down."""
     p = subprocess.Popen(

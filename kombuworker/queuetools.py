@@ -32,7 +32,10 @@ __DIE_THREADQ = queue.Queue()  # whether to 'ack' the received messages
 
 
 def insert_msgs(
-    queue_url: str, queue_name: str, payloads: Iterable, connect_timeout: int = 60
+    queue_url: str,
+    queue_name: str,
+    payloads: Iterable,
+    connect_timeout: Optional[int] = 60,
 ) -> None:
     """Inserts multiple messages into a queue."""
     with Connection(queue_url, connect_timeout=connect_timeout) as conn:
@@ -49,13 +52,13 @@ def submit_msg(queue: SimpleQueue, payload: str) -> None:
 def fetch_msgs(
     queue_url: str,
     queue_name: str,
-    init_waiting_period: int = 1,
-    max_waiting_period: int = 60,
-    max_num_retries: int = 5,
-    verbose: bool = False,
-    rec_threadq: queue.Queue = __REC_THREADQ,
-    ack_threadq: queue.Queue = __ACK_THREADQ,
-    die_threadq: queue.Queue = __DIE_THREADQ,
+    init_waiting_period: Optional[int] = 1,
+    max_waiting_period: Optional[int] = 60,
+    max_num_retries: Optional[int] = 5,
+    verbose: Optional[bool] = False,
+    rec_threadq: Optional[queue.Queue] = __REC_THREADQ,
+    ack_threadq: Optional[queue.Queue] = __ACK_THREADQ,
+    die_threadq: Optional[queue.Queue] = __DIE_THREADQ,
 ) -> Generator[kombu.Message, None, None]:
     """Generator for continuously pulling messages from a queue.
 
@@ -105,6 +108,9 @@ def fetch_msgs(
             sleep(waiting_period)
             waiting_period = min(waiting_period * 2, max_waiting_period)
 
+        except GeneratorExit:  # fetch_msgs.close()
+            break
+
     die_threadq.put("DIE")
     while th.is_alive():
         th.join()
@@ -123,10 +129,10 @@ def _fetch_thread(
     rec_threadq: queue.Queue,
     ack_threadq: queue.Queue,
     die_threadq: queue.Queue,
-    connect_timeout: int = 120,
-    heartbeat_interval: int = 60,
-    verbose: bool = False,
-    sleep_interval=1,
+    connect_timeout: Optional[int] = 120,
+    heartbeat_interval: Optional[int] = 60,
+    verbose: Optional[bool] = False,
+    sleep_interval: Optional[int] = 1,
 ) -> None:
     """Thread for fetching raw tasks and maintaining a heartbeat."""
     with Connection(
@@ -137,9 +143,6 @@ def _fetch_thread(
         heartbeat_time = time.time()
 
         while True:
-            if not die_threadq.empty():
-                die_threadq.get()
-                return
 
             if state == ThreadState.FETCH:
                 try:
@@ -153,11 +156,8 @@ def _fetch_thread(
             elif state == ThreadState.WAIT:
                 # delete task from queue if desired
                 if not ack_threadq.empty():
-                    msg_or_die = ack_threadq.get()
-                    if isinstance(msg_or_die, kombu.Message):
-                        msg_or_die.ack()
-                    elif msg_or_die == DIEFLAG:
-                        return
+                    msg = ack_threadq.get()
+                    msg.ack()
 
                     state = ThreadState.FETCH
                     heartbeat_time = time.time()
@@ -174,9 +174,20 @@ def _fetch_thread(
                     else:
                         sleep(sleep_interval)
 
+            if not die_threadq.empty():
+                # clean up if there's a dangling message
+                if not ack_threadq.empty():
+                    msg = ack_threadq.get()
+                    msg.ack()
+
+                die_threadq.get()
+                return
+
 
 def fetch_msg(
-    queue: SimpleQueue, rec_threadq: Optional[queue.Queue] = None, verbose: bool = False
+    queue: SimpleQueue,
+    rec_threadq: Optional[queue.Queue] = None,
+    verbose: Optional[bool] = False,
 ):
     """Moves a message payload from the remote queue to the local thread queue.
 
@@ -205,7 +216,10 @@ def fetch_msg(
 
 
 def num_msgs(
-    queue_url: str, queue_name: str, username: str = "guest", password: str = "guest"
+    queue_url: str,
+    queue_name: str,
+    username: Optional[str] = "guest",
+    password: Optional[str] = "guest",
 ) -> int:
     """Determines how many messages are left in a queue."""
     rq_host = urlparse(queue_url).netloc.split(":")[0]
@@ -223,12 +237,14 @@ def num_msgs(
     return int(ret.json()["messages"])
 
 
-def print_msg_received(message) -> None:
+def print_msg_received(message: kombu.Message) -> None:
     """Prints a simple 'message received' statement with the payload."""
     print(f"Fetched a message from the queue: {message.payload}")
 
 
-def ack_msg(msg: kombu.Message, ack_threadq: queue.Queue = __ACK_THREADQ) -> None:
+def ack_msg(
+    msg: kombu.Message, ack_threadq: Optional[queue.Queue] = __ACK_THREADQ
+) -> None:
     """Adds a message to the ack queue to be ack'ed by the fetch thread."""
     ack_threadq.put(msg)
 

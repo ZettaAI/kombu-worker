@@ -5,7 +5,7 @@ import sys
 import time
 import json
 import signal
-from typing import Union, Iterable, Generator
+from typing import Union, Iterable, Generator, Optional
 
 from taskqueue.lib import jsonify
 from taskqueue.queueables import totask, FunctionTask, RegisteredTask
@@ -23,32 +23,40 @@ def insert_tasks(queue_url: str, queue_name: str, tasks: Iterable):
 def fetch_tasks(
     queue_url: str,
     queue_name: str,
-    init_waiting_period: int = 1,
-    max_waiting_period: int = 60,
-    max_num_retries: int = 5,
-    verbose: bool = False,
+    init_waiting_period: Optional[int] = 1,
+    max_waiting_period: Optional[int] = 60,
+    max_num_retries: Optional[int] = 5,
+    verbose: Optional[bool] = False,
 ) -> Generator[Union[FunctionTask, RegisteredTask], None, None]:
     """Fetches tasks from the queue."""
-    for message in qt.fetch_msgs(
+    it = qt.fetch_msgs(
         queue_url,
         queue_name,
         init_waiting_period=init_waiting_period,
         max_waiting_period=max_waiting_period,
         max_num_retries=max_num_retries,
         verbose=verbose,
-    ):
-        yield totask(json.loads(message.payload)), message
+    )
+
+    for message in it:
+        try:
+            yield totask(json.loads(message.payload)), message
+
+        except GeneratorExit:
+            it.close()
+            return
 
 
 def poll(
     queue_url: str,
     queue_name: str,
-    init_waiting_period: int = 1,
-    max_waiting_period: int = 60,
-    max_num_retries: int = 5,
-    verbose: bool = False,
+    init_waiting_period: Optional[int] = 1,
+    max_waiting_period: Optional[int] = 60,
+    max_num_retries: Optional[int] = 5,
+    verbose: Optional[bool] = False,
 ) -> None:
     """Fetches tasks and executes them."""
+    global KEEP_LOOPING
     KEEP_LOOPING = True
 
     def sigint_handler(signum, frame):
@@ -91,3 +99,4 @@ def poll(
             break
 
     signal.signal(signal.SIGINT, prev_sigint_handler)
+    it.close()

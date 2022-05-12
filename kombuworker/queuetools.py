@@ -75,6 +75,9 @@ def fetch_msgs(
     waiting_period = init_waiting_period
     num_tries = 0
 
+    conn = Connection(queue_url)
+    queue = conn.SimpleQueue(queue_name)
+
     while True:
         try:
             msg = rec_threadq.get_nowait()
@@ -88,7 +91,7 @@ def fetch_msgs(
 
         except queue.Empty:
             try:
-                num_in_queue = num_msgs(queue_url)
+                num_in_queue = queue.qsize()
                 if num_in_queue == 0:
                     if verbose:
                         print("queue empty")
@@ -111,6 +114,7 @@ def fetch_msgs(
         except GeneratorExit:  # fetch_msgs.close()
             break
 
+    conn.close()
     die_threadq.put("DIE")
     while th.is_alive():
         th.join()
@@ -213,28 +217,6 @@ def fetch_msg(
         rec_threadq.put(msg)
 
     return msg
-
-
-def num_msgs(
-    queue_url: str,
-    queue_name: str,
-    username: Optional[str] = "guest",
-    password: Optional[str] = "guest",
-) -> int:
-    """Determines how many messages are left in a queue."""
-    rq_host = urlparse(queue_url).netloc.split(":")[0]
-
-    ret = requests.get(
-        f"http://{rq_host}:15672/api/queues/%2f/{queue_name}", auth=(username, password)
-    )
-
-    if not ret.ok:
-        raise RuntimeError(
-            f"Cannot fetch information about {queue_name}"
-            " from rabbitmq management interface"
-        )
-
-    return int(ret.json()["messages"])
 
 
 def print_msg_received(message: kombu.Message) -> None:

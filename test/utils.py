@@ -13,19 +13,13 @@ def count_msgs(queue_url: str, queue_name: str) -> int:
 
     Also empties the queue.
     """
-    num_fetched = 0
     with Connection(queue_url) as conn:
         queue = conn.SimpleQueue(queue_name)
 
-        while True:
-            try:
-                msg = queue.get_nowait()
-                msg.ack()
-                num_fetched += 1
-            except SimpleQueue.Empty:
-                break
+        size = queue.qsize()
+        queue.clear()
 
-        return num_fetched
+        return size
 
 
 def clear_queue(queue_url: str, queue_name: str) -> None:

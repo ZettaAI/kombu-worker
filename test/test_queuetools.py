@@ -1,6 +1,9 @@
 """Tests for kombuworker/queuetools.py"""
+import os
 import sys
 import time
+import signal
+import threading
 
 from kombuworker import queuetools as qt
 import utils
@@ -35,9 +38,46 @@ def test_fetch(rabbitMQurl):
         QUEUENAME,
         init_waiting_period=0.1,
         max_waiting_period=1,
-        verbose=False,
+        verbose=True,
     ):
         qt.ack_msg(msg)
         num_fetched += 1
 
     assert num_fetched == len(payloads)
+
+
+def stub_test_indefinite(rabbitMQurl):
+    """Killing an indefinite fetching generator.
+
+    Starts a fetch_msgs generator that should never give us back control,
+    but also starts a thread to kill it.
+
+    This currently doesn't work bc pytest enforces its own signal handling.
+    """
+    it = None
+
+    def sigint_handler(signum, frame):
+        print("SIGINT received. Stopping fetch_msgs")
+        it.close()
+
+    prev_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, sigint_handler)
+
+    def wait_to_kill():
+        time.sleep(1)
+        os.kill(os.getpid(), signal.SIGINT)
+
+    th = threading.Thread(target=wait_to_kill)
+    th.daemon = True
+    th.start()
+
+    it = qt.fetch_msgs(
+        rabbitMQurl,
+        QUEUENAME,
+        init_waiting_period=0.1,
+        max_waiting_period=1,
+        max_num_retries=None,
+        verbose=True,
+    )
+
+    signal.signal(signal.SIGINT, prev_handler)

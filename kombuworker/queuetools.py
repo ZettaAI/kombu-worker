@@ -105,7 +105,7 @@ def fetch_msgs(
 
             except Exception:
                 num_tries += 1
-                if num_tries > max_num_retries:
+                if max_num_retries is not None and num_tries > max_num_retries:
                     break
 
             sleep(waiting_period)

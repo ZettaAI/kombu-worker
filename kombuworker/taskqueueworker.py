@@ -12,6 +12,8 @@ from taskqueue.queueables import totask, FunctionTask, RegisteredTask
 
 from . import queuetools as qt
 
+from .log import logger
+
 
 def insert_tasks(queue_url: str, queue_name: str, tasks: Iterable):
     """Inserts tasks into a queue."""
@@ -62,11 +64,10 @@ def poll(
     def sigint_handler(signum, frame):
         global KEEP_LOOPING
         if KEEP_LOOPING:
-            print(
+            logger.info(
                 "Interrupted."
                 " Exiting after this task completes."
                 " Interrupt again to exit now.",
-                flush=True,
             )
             KEEP_LOOPING = False
         else:
@@ -93,7 +94,7 @@ def poll(
             elapsed = time.time() - start_time
 
             qt.ack_msg(msg)
-            print(f"Task successfully executed in {elapsed:.2f}s")
+            logger.info(f"Task successfully executed in {elapsed:.2f}s")
 
         except StopIteration:
             break

@@ -1,4 +1,6 @@
 """Task interface where user packages define how to parse tasks."""
+from __future__ import annotations
+
 import sys
 import json
 import time
@@ -7,6 +9,7 @@ from types import SimpleNamespace
 from typing import Optional, Callable
 
 from . import queuetools as qt
+from .log import logger
 
 
 def parse_queue(
@@ -77,18 +80,17 @@ def poll(
     def siginthandler(signum, frame):
         global KEEP_LOOPING
         if KEEP_LOOPING:
-            print(
+            logger.info(
                 "Interrupted w/ SIGINT."
                 " Exiting after this task completes."
                 " Interrupt again to exit now.",
-                flush=True,
             )
             KEEP_LOOPING = False
         else:
             sys.exit()
 
     def sigtermhandler(signum, frame):
-        print("Interrupted w/ SIGTERM. Exiting now.", flush=True)
+        logger.info("Interrupted w/ SIGTERM. Exiting now.")
         sys.exit()
 
     prev_siginthandler = signal.getsignal(signal.SIGINT)
@@ -119,7 +121,7 @@ def poll(
             elapsed = time.time() - start_time
 
             qt.ack_msg(msg)
-            print(f"Task successfully executed in {elapsed:.2f}s")
+            logger.info(f"Task successfully executed in {elapsed:.2f}s")
 
         except StopIteration:
             break

@@ -3,10 +3,13 @@ import sys
 import json
 import time
 import signal
+
 from types import SimpleNamespace
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 
 from . import queuetools as qt
+
+from kombuworker.log import logger as kwlogger
 
 
 def parse_queue(
@@ -25,7 +28,11 @@ def parse_queue(
 
 
 def insert_task(
-    queue_url: str, tool_name: str, *args: list, queue_name: str = None, **kwargs: dict,
+    queue_url: str,
+    tool_name: str,
+    *args: list,
+    queue_name: str = None,
+    **kwargs: dict,
 ) -> None:
     """Submits a single task to the desired queue."""
     insert_tasks(queue_url, tool_name, [args], [kwargs], queue_name=queue_name)
@@ -34,8 +41,8 @@ def insert_task(
 def insert_tasks(
     queue_url: str,
     tool_name: str,
-    task_args: list[list],
-    task_kwargs: list[dict],
+    task_args: List[list],
+    task_kwargs: List[dict],
     queue_name: str = None,
 ) -> None:
     """Submits a set of tasks to the desired queue.
@@ -77,18 +84,18 @@ def poll(
     def siginthandler(signum, frame):
         global KEEP_LOOPING
         if KEEP_LOOPING:
-            print(
+            kwlogger.info(
                 "Interrupted w/ SIGINT."
                 " Exiting after this task completes."
                 " Interrupt again to exit now.",
-                flush=True,
             )
             KEEP_LOOPING = False
         else:
             sys.exit()
 
     def sigtermhandler(signum, frame):
-        print("Interrupted w/ SIGTERM. Exiting now.", flush=True)
+
+        kwlogger.info("Interrupted w/ SIGTERM. Exiting now.")
         sys.exit()
 
     prev_siginthandler = signal.getsignal(signal.SIGINT)
@@ -119,7 +126,7 @@ def poll(
             elapsed = time.time() - start_time
 
             qt.ack_msg(msg)
-            print(f"Task successfully executed in {elapsed:.2f}s")
+            kwlogger.info(f"Task successfully executed in {elapsed:.2f}s")
 
         except StopIteration:
             break

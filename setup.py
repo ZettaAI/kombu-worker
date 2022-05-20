@@ -14,5 +14,5 @@ setup(
     author_email="nturner@zetta.ai",
     url="https://github.com/ZettaAI/kombu-worker",
     packages=setuptools.find_packages(),
-    install_requires=["kombu", "tenacity", "requests"],
+    install_requires=["kombu", "tenacity", "requests", "task-queue"],
 )

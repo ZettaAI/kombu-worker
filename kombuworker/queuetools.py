@@ -16,6 +16,8 @@ import tenacity
 from kombu import Connection
 from kombu.simple import SimpleQueue
 
+from .log import logger
+
 
 # Defining retry behavior for submit_task (a few lines down)
 retry = tenacity.retry(
@@ -83,7 +85,7 @@ def fetch_msgs(
             msg = rec_threadq.get_nowait()
 
             if verbose:
-                print(f"message received: {msg}")
+                logger.info(f"message received: {msg}")
             waiting_period = init_waiting_period
             num_tries = 0
 
@@ -94,11 +96,11 @@ def fetch_msgs(
                 num_in_queue = queue.qsize()
                 if num_in_queue == 0:
                     if verbose:
-                        print("queue empty")
+                        logger.info("queue empty")
                     raise Exception("queue empty")  # increment num_tries
                 else:
                     if verbose:
-                        print(
+                        logger.info(
                             f"{num_in_queue} messages remain in the queue,"
                             f" sleeping for {waiting_period}s"
                         )
@@ -221,7 +223,7 @@ def fetch_msg(
 
 def print_msg_received(message: kombu.Message) -> None:
     """Prints a simple 'message received' statement with the payload."""
-    print(f"Fetched a message from the queue: {message.payload}")
+    logger.info(f"Fetched a message from the queue: {message.payload}")
 
 
 def ack_msg(

@@ -15,4 +15,10 @@ setup(
     url="https://github.com/ZettaAI/kombu-worker",
     packages=setuptools.find_packages(),
     install_requires=["kombu", "tenacity", "requests"],
+    extras_require={
+        "test": [
+            "pytest",  # potentiall would be good to pin the verision
+            "task-queue",
+        ]
+    },
 )

@@ -1,3 +1,6 @@
+"""Output logging."""
+from __future__ import annotations
+
 import logging
 import time
 import os
@@ -24,7 +27,13 @@ def configure_logger(
 
     ch = logging.StreamHandler()
     ch.setLevel(log_level)
-    info_format = "[%(asctime)s.%(msecs)03d, pid%(process)6s, %(filename)20s:%(lineno)4d] %(levelname)6s - %(message)s"
+    info_format = (
+        "[%(asctime)s.%(msecs)03d"
+        ", pid%(process)6s"
+        ", %(filename)20s:%(lineno)4d]"
+        " %(levelname)6s"
+        " - %(message)s"
+    )
     time_format = "%m-%d %H:%M:%S"
     formatter = logging.Formatter(info_format, time_format)
     ch.setFormatter(formatter)

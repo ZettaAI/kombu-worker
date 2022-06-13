@@ -59,7 +59,7 @@ def poll(
 ) -> None:
     """Fetches tasks and executes them."""
     global KEEP_LOOPING
-    KEEP_LOOPING = True
+    KEEP_LOOPING = True  # type: ignore[name-defined]
 
     def sigint_handler(signum, frame):
         global KEEP_LOOPING
@@ -85,7 +85,7 @@ def poll(
         verbose=verbose,
     )
 
-    while KEEP_LOOPING:
+    while KEEP_LOOPING:  # type: ignore[name-defined]
         try:
             task, msg = next(it)
 

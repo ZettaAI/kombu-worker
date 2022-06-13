@@ -8,10 +8,8 @@ import threading
 from enum import Enum
 from time import sleep
 from typing import Generator, Iterable, Optional
-from urllib.parse import urlparse
 
 import kombu
-import requests
 import tenacity
 from kombu import Connection
 from kombu.simple import SimpleQueue
@@ -28,9 +26,9 @@ retry = tenacity.retry(
 
 # Queues for inter-thread communication
 # these should only hold one message at most unless someone's messing with them
-__REC_THREADQ = queue.Queue()  # stores received messages
-__ACK_THREADQ = queue.Queue()  # whether to 'ack' the received messages
-__DIE_THREADQ = queue.Queue()  # whether to 'ack' the received messages
+__REC_THREADQ: queue.Queue = queue.Queue()  # stores received messages
+__ACK_THREADQ: queue.Queue = queue.Queue()  # whether to 'ack' the received messages
+__DIE_THREADQ: queue.Queue = queue.Queue()  # whether to 'ack' the received messages
 
 
 def insert_msgs(

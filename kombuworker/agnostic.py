@@ -6,7 +6,7 @@ import json
 import time
 import signal
 from types import SimpleNamespace
-from typing import Optional, Callable
+from typing import Optional, Callable, Iterable, Any
 
 from . import queuetools as qt
 from .log import logger
@@ -28,7 +28,11 @@ def parse_queue(
 
 
 def insert_task(
-    queue_url: str, tool_name: str, *args: list, queue_name: str = None, **kwargs: dict,
+    queue_url: str,
+    tool_name: str,
+    *args: Any,
+    queue_name: str = None,
+    **kwargs: Any,
 ) -> None:
     """Submits a single task to the desired queue."""
     insert_tasks(queue_url, tool_name, [args], [kwargs], queue_name=queue_name)
@@ -37,7 +41,7 @@ def insert_task(
 def insert_tasks(
     queue_url: str,
     tool_name: str,
-    task_args: list[list],
+    task_args: list[Iterable],
     task_kwargs: list[dict],
     queue_name: str = None,
 ) -> None:
@@ -75,7 +79,7 @@ def poll(
     q = parse_queue(queue_url, tool_name, queue_name)
 
     global KEEP_LOOPING
-    KEEP_LOOPING = True
+    KEEP_LOOPING = True  # type: ignore[name-defined]
 
     def siginthandler(signum, frame):
         global KEEP_LOOPING
@@ -108,7 +112,7 @@ def poll(
         verbose=verbose,
     )
 
-    while KEEP_LOOPING:
+    while KEEP_LOOPING:  # type: ignore[name-defined]
         try:
             msg = next(it)
             parsed = json.loads(msg.payload)

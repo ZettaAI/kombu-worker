@@ -5,7 +5,7 @@ import sys
 import time
 import json
 import signal
-from typing import Union, Iterable, Generator, Optional
+from typing import Union, Iterable, Generator
 
 from taskqueue.lib import jsonify
 from taskqueue.queueables import totask, FunctionTask, RegisteredTask
@@ -25,10 +25,10 @@ def insert_tasks(queue_url: str, queue_name: str, tasks: Iterable):
 def fetch_tasks(
     queue_url: str,
     queue_name: str,
-    init_waiting_period: Optional[int] = 1,
-    max_waiting_period: Optional[int] = 60,
-    max_num_retries: Optional[int] = 5,
-    verbose: Optional[bool] = False,
+    init_waiting_period: int = 1,
+    max_waiting_period: int = 60,
+    max_num_retries: int = 5,
+    verbose: bool = False,
 ) -> Generator[Union[FunctionTask, RegisteredTask], None, None]:
     """Fetches tasks from the queue."""
     it = qt.fetch_msgs(
@@ -52,10 +52,10 @@ def fetch_tasks(
 def poll(
     queue_url: str,
     queue_name: str,
-    init_waiting_period: Optional[int] = 1,
-    max_waiting_period: Optional[int] = 60,
-    max_num_retries: Optional[int] = 5,
-    verbose: Optional[bool] = False,
+    init_waiting_period: int = 1,
+    max_waiting_period: int = 60,
+    max_num_retries: int = 5,
+    verbose: bool = False,
 ) -> None:
     """Fetches tasks and executes them."""
     global KEEP_LOOPING

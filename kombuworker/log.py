@@ -3,16 +3,15 @@ import time
 import os
 import pathlib
 from datetime import datetime
-from typing import Optional, Callable
 
 
 logger = logging.getLogger("kombuworker")
 
 
 def configure_logger(
-    name: Optional[str] = "kombuworker",
-    verbose: Optional[bool] = True,
-    log_folder: Optional[str] = "/tmp/logs/kombuworker",
+    name: str = "kombuworker",
+    verbose: bool = True,
+    log_folder: str = "/tmp/logs/kombuworker",
 ):
     global logger
 

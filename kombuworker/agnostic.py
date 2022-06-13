@@ -62,10 +62,10 @@ def poll(
     tool_name: str,
     task_parser: Callable,
     queue_name: Optional[str] = None,
-    init_waiting_period: Optional[int] = 1,
-    max_waiting_period: Optional[int] = 60,
-    max_num_retries: Optional[int] = 5,
-    verbose: Optional[bool] = False,
+    init_waiting_period: int = 1,
+    max_waiting_period: int = 60,
+    max_num_retries: int = 5,
+    verbose: bool = False,
 ) -> None:
     """Fetches tasks and executes them.
 

@@ -1,0 +1,4 @@
+kombu
+python_version>="3.7"
+requests
+tenacity

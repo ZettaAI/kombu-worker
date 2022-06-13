@@ -1,0 +1,10 @@
+black ==21.9.b0
+click ==8.0.1
+kombu
+mypy ==0.961
+pylint ==2.13.9
+pytest ==7.1.2
+python_version>="3.7"
+requests
+tenacity
+task-queue

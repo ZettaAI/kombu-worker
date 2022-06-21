@@ -27,6 +27,15 @@ def parse_queue(
     return q
 
 
+def purge_queue(
+    queue_url: str, tool_name: str, queue_name: Optional[str] = None
+) -> None:
+    """Purges a tool-specific sub-queue."""
+    q = parse_queue(queue_url, tool_name, queue_name)
+
+    qt.purge_queue(q.url, q.name)
+
+
 def insert_task(
     queue_url: str,
     tool_name: str,

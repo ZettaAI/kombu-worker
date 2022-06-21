@@ -5,6 +5,7 @@ import time
 import signal
 import threading
 
+from kombu import Connection
 from kombuworker import queuetools as qt
 import utils
 
@@ -44,6 +45,56 @@ def test_fetch(rabbitMQurl):
         num_fetched += 1
 
     assert num_fetched == len(payloads)
+
+
+def test_num_msgs_rabbitmq(rabbitMQurl):
+    payloads = ["test"] * 10
+    qt.insert_msgs(rabbitMQurl, QUEUENAME, payloads)
+    time.sleep(5)
+
+    # can we see new messages?
+    assert qt.num_msgs_rabbitmq(rabbitMQurl, QUEUENAME) == len(payloads)
+
+    with Connection(rabbitMQurl) as conn:
+        queue = conn.SimpleQueue(QUEUENAME)
+        msg = queue.get_nowait()
+
+        assert queue.qsize() == len(payloads) - 1
+
+        time.sleep(5)
+
+        # can we see "not visible" messages?
+        assert qt.num_msgs_rabbitmq(rabbitMQurl, QUEUENAME) == len(payloads)
+
+        msg.ack()
+        time.sleep(5)
+
+        assert qt.num_msgs_rabbitmq(rabbitMQurl, QUEUENAME) == len(payloads) - 1
+
+    utils.clear_queue(rabbitMQurl, QUEUENAME)
+
+
+def test_num_msgs_sqs(SQSurl):
+    payloads = ["test"] * 10
+    qt.insert_msgs(SQSurl, QUEUENAME, payloads)
+
+    # can we see new messages?
+    assert qt.num_msgs_sqs(SQSurl, QUEUENAME) == len(payloads)
+
+    with Connection(SQSurl) as conn:
+        queue = conn.SimpleQueue(QUEUENAME)
+        msg = queue.get_nowait()
+
+        assert queue.qsize() == len(payloads) - 1
+
+        # can we see "not visible" messages?
+        assert qt.num_msgs_sqs(SQSurl, QUEUENAME) == len(payloads)
+
+        msg.ack()
+
+        assert qt.num_msgs_sqs(SQSurl, QUEUENAME) == len(payloads) - 1
+
+    utils.clear_queue(SQSurl, QUEUENAME)
 
 
 def stub_test_indefinite(rabbitMQurl):

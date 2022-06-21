@@ -4,9 +4,11 @@ from __future__ import annotations
 import time
 import queue
 import socket
+import requests
 import threading
 from enum import Enum
 from time import sleep
+from urllib.parse import urlparse
 from typing import Generator, Iterable, Optional
 
 import kombu
@@ -75,9 +77,6 @@ def fetch_msgs(
     waiting_period = init_waiting_period
     num_tries = 0
 
-    conn = Connection(queue_url)
-    queue = conn.SimpleQueue(queue_name)
-
     while True:
         try:
             msg = rec_threadq.get_nowait()
@@ -91,7 +90,7 @@ def fetch_msgs(
 
         except queue.Empty:
             try:
-                num_in_queue = queue.qsize()
+                num_in_queue = num_msgs(queue_url, queue_name)
                 if num_in_queue == 0:
                     if verbose:
                         logger.info("queue empty")
@@ -114,7 +113,6 @@ def fetch_msgs(
         except GeneratorExit:  # fetch_msgs.close()
             break
 
-    conn.close()
     die_threadq.put("DIE")
     while th.is_alive():
         th.join()
@@ -234,3 +232,94 @@ def purge_queue(queue_url: str, queue_name: str) -> None:
     with Connection(queue_url) as conn:
         queue = conn.SimpleQueue(queue_name)
         queue.clear()
+
+
+def num_msgs(
+    queue_url: str,
+    queue_name: str,
+    username: str = "guest",
+    password: str = "guest",
+) -> int:
+    """Determines how many messages are left in a queue.
+
+    This INCLUDES messages that are not currently ready for delivery (i.e.,
+    un-acked messages).
+    """
+    if queue_url.startswith("amqp://"):
+        # assume RabbitMQ for now
+        return num_msgs_rabbitmq(
+            queue_url, queue_name, username=username, password=password
+        )
+    elif queue_url.startswith("sqs://"):
+        return num_msgs_sqs(queue_url, queue_name)
+    else:
+        raise ValueError(f"unrecognized queue url: {queue_url}")
+
+
+def num_msgs_rabbitmq(
+    queue_url: str,
+    queue_name: str,
+    username: str = "guest",
+    password: str = "guest",
+) -> int:
+    """Determines how many messages are left in RabbitMQ.
+
+    This INCLUDES messages that are not currently ready for delivery (i.e.,
+    un-acked messages).
+
+    Uses the REST API for RabbitMQ management.
+    """
+    return int(
+        rabbitmq_queue_request(queue_url, queue_name, username, password).json()[
+            "messages"
+        ]
+    )
+
+
+def rabbitmq_queue_request(
+    queue_url: str,
+    queue_name: str,
+    username: str = "guest",
+    password: str = "guest",
+) -> requests.models.Response:
+    rq_host = urlparse(queue_url).netloc.split(":")[0]
+
+    ret = requests.get(
+        f"http://{rq_host}:15672/api/queues/%2f/{queue_name}", auth=(username, password)
+    )
+
+    if not ret.ok or "messages" not in ret.json():
+        raise RuntimeError(
+            f"Cannot fetch information about {queue_name}"
+            "from rabbitmq management interface"
+        )
+
+    return ret
+
+
+def num_msgs_sqs(queue_url: str, queue_name: str, connect_timeout: int = 60) -> int:
+    """Determines how many messages are left in an SQS queue.
+
+    This INCLUDES messages that are not currently ready for delivery (i.e.,
+    un-acked messages).
+
+    Uses the sqs boto interface.
+    """
+    with Connection(queue_url, connect_timeout=connect_timeout) as conn:
+        queue = conn.SimpleQueue(queue_name)
+        # kombu SQS interface
+        channel = queue.queue.channel
+
+        url = channel._new_queue(queue_name)
+        botoclient = channel.sqs(queue=channel.canonical_queue_name(queue_name))
+        resp = botoclient.get_queue_attributes(
+            QueueUrl=url,
+            AttributeNames=[
+                "ApproximateNumberOfMessages",
+                "ApproximateNumberOfMessagesNotVisible",
+            ],
+        )
+
+        return int(resp["Attributes"]["ApproximateNumberOfMessages"]) + int(
+            resp["Attributes"]["ApproximateNumberOfMessagesNotVisible"]
+        )

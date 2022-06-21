@@ -3,7 +3,6 @@ import time
 
 import requests
 from kombu import Connection
-from kombu.simple import SimpleQueue
 
 from kombuworker import queuetools as qt
 

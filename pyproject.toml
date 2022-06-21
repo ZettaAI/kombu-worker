@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools >= 40.6.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+target-version = ["py37", "py38", "py39"]
+
+[flake8]
+ignore = "W503,W504"
+max-line-length = 88

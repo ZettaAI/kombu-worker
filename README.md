@@ -12,7 +12,7 @@ pip install git+https://github.com/ZettaAI/kombu-worker
 
 ## Usage
 
-There are two intended interfaces to use these tools. 
+There are two intended interfaces to use these tools.
 
 #### taskqueueworker
 The `taskqueueworker` interface abstracts most details of working with the queue, and replicates [python-task-queue](https://github.com/seung-lab/python-task-queue) functions.

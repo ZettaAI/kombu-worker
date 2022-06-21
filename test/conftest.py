@@ -42,7 +42,7 @@ def rabbitMQurl():
 
     if p.returncode is None:
         p.terminate()
-        returncode = p.wait(5)
+        p.wait(5)
 
     if p.returncode is None:
         p.kill()

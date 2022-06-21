@@ -8,10 +8,8 @@ import threading
 from enum import Enum
 from time import sleep
 from typing import Generator, Iterable, Optional
-from urllib.parse import urlparse
 
 import kombu
-import requests
 import tenacity
 from kombu import Connection
 from kombu.simple import SimpleQueue
@@ -28,16 +26,16 @@ retry = tenacity.retry(
 
 # Queues for inter-thread communication
 # these should only hold one message at most unless someone's messing with them
-__REC_THREADQ = queue.Queue()  # stores received messages
-__ACK_THREADQ = queue.Queue()  # whether to 'ack' the received messages
-__DIE_THREADQ = queue.Queue()  # whether to 'ack' the received messages
+__REC_THREADQ: queue.Queue = queue.Queue()  # stores received messages
+__ACK_THREADQ: queue.Queue = queue.Queue()  # whether to 'ack' the received messages
+__DIE_THREADQ: queue.Queue = queue.Queue()  # whether to 'ack' the received messages
 
 
 def insert_msgs(
     queue_url: str,
     queue_name: str,
     payloads: Iterable,
-    connect_timeout: Optional[int] = 60,
+    connect_timeout: int = 60,
 ) -> None:
     """Inserts multiple messages into a queue."""
     with Connection(queue_url, connect_timeout=connect_timeout) as conn:
@@ -54,13 +52,13 @@ def submit_msg(queue: SimpleQueue, payload: str) -> None:
 def fetch_msgs(
     queue_url: str,
     queue_name: str,
-    init_waiting_period: Optional[int] = 1,
-    max_waiting_period: Optional[int] = 60,
-    max_num_retries: Optional[int] = 5,
-    verbose: Optional[bool] = False,
-    rec_threadq: Optional[queue.Queue] = __REC_THREADQ,
-    ack_threadq: Optional[queue.Queue] = __ACK_THREADQ,
-    die_threadq: Optional[queue.Queue] = __DIE_THREADQ,
+    init_waiting_period: int = 1,
+    max_waiting_period: int = 60,
+    max_num_retries: int = 5,
+    verbose: bool = False,
+    rec_threadq: queue.Queue = __REC_THREADQ,
+    ack_threadq: queue.Queue = __ACK_THREADQ,
+    die_threadq: queue.Queue = __DIE_THREADQ,
 ) -> Generator[kombu.Message, None, None]:
     """Generator for continuously pulling messages from a queue.
 
@@ -135,10 +133,10 @@ def _fetch_thread(
     rec_threadq: queue.Queue,
     ack_threadq: queue.Queue,
     die_threadq: queue.Queue,
-    connect_timeout: Optional[int] = 120,
-    heartbeat_interval: Optional[int] = 60,
-    verbose: Optional[bool] = False,
-    sleep_interval: Optional[int] = 1,
+    connect_timeout: int = 120,
+    heartbeat_interval: int = 60,
+    verbose: bool = False,
+    sleep_interval: int = 1,
 ) -> None:
     """Thread for fetching raw tasks and maintaining a heartbeat."""
     with Connection(
@@ -193,7 +191,7 @@ def _fetch_thread(
 def fetch_msg(
     queue: SimpleQueue,
     rec_threadq: Optional[queue.Queue] = None,
-    verbose: Optional[bool] = False,
+    verbose: bool = False,
 ):
     """Moves a message payload from the remote queue to the local thread queue.
 
@@ -226,9 +224,7 @@ def print_msg_received(message: kombu.Message) -> None:
     logger.info(f"Fetched a message from the queue: {message.payload}")
 
 
-def ack_msg(
-    msg: kombu.Message, ack_threadq: Optional[queue.Queue] = __ACK_THREADQ
-) -> None:
+def ack_msg(msg: kombu.Message, ack_threadq: queue.Queue = __ACK_THREADQ) -> None:
     """Adds a message to the ack queue to be ack'ed by the fetch thread."""
     ack_threadq.put(msg)
 

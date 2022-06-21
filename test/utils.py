@@ -8,7 +8,7 @@ from kombuworker import queuetools as qt
 
 
 def count_msgs(queue_url: str, queue_name: str) -> int:
-    """Counts the number of remaining messages in a queue.
+    """Counts the number of remaining (visible) messages in a queue.
 
     Also empties the queue.
     """

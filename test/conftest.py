@@ -30,6 +30,34 @@ def rabbitMQurl():
 
     yield "amqp://localhost:5672"
 
+    kill_subprocess(p)
+
+
+@pytest.fixture(scope="session")
+def SQSurl():
+    """Starts an ElasticMQ docker container and tears it down."""
+    p = subprocess.Popen(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            "elasticmq",
+            "-p",
+            "9324:9324",
+            "-p",
+            "9325:9325",
+            "softwaremill/elasticmq-native",
+        ]
+    )
+    time.sleep(0.5)
+
+    yield "sqs://localhost:9324"
+
+    kill_subprocess(p)
+
+
+def kill_subprocess(p: subprocess.Popen) -> None:
     # Being a bit obsessive here
     retries = 10
     while retries > 0:

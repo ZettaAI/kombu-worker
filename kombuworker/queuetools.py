@@ -66,13 +66,19 @@ def fetch_msgs(
 
     This is the primary interface for pulling tasks.
     """
-    th = threading.Thread(
-        target=_fetch_thread,
-        args=(queue_url, queue_name, rec_threadq, ack_threadq, die_threadq),
-        kwargs=dict(verbose=verbose, sleep_interval=init_waiting_period),
-    )
-    th.daemon = True
-    th.start()
+
+    def start_thread():
+        th = threading.Thread(
+            target=_fetch_thread,
+            args=(queue_url, queue_name, rec_threadq, ack_threadq, die_threadq),
+            kwargs=dict(verbose=verbose, sleep_interval=init_waiting_period),
+        )
+        th.daemon = True
+        th.start()
+
+        return th
+
+    th = start_thread()
 
     waiting_period = init_waiting_period
     num_tries = 0
@@ -112,6 +118,10 @@ def fetch_msgs(
 
         except GeneratorExit:  # fetch_msgs.close()
             break
+
+        if not th.is_alive():
+            logger.info("Fetch thread died. Restarting it")
+            th = start_thread()
 
     die_threadq.put("DIE")
     while th.is_alive():
